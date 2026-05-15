@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>皇帝模拟器：康康之治</title>
+    <style>
+        body { background-color: #2c3e50; color: #ecf0f1; font-family: "Microsoft YaHei", sans-serif; text-align: center; margin: 0; padding: 20px; }
+        #game-container { background: #34495e; width: 680px; margin: 10px auto; padding: 25px; border: 5px solid #c0392b; border-radius: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .stats-bar { display: flex; justify-content: space-around; background: #2c3e50; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-weight: bold; border: 1px solid #7f8c8d; }
+        .stat-item { color: #f1c40f; }
+        .minister-zone { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .m-card { background: #1a252f; padding: 10px; border-radius: 5px; width: 30%; font-size: 13px; border-top: 4px solid #3498db; }
+        .m-name { color: #3498db; display: block; margin-bottom: 5px; font-weight: bold;}
+        .favor-bar { background: #555; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+        .favor-fill { background: #2ecc71; height: 100%; transition: 0.5s; width: 50%; }
+        #event-box { background: #ecf0f1; color: #2c3e50; padding: 20px; border-radius: 8px; min-height: 140px; text-align: left; line-height: 1.6; font-size: 18px; margin-bottom: 25px; border-left: 10px solid #c0392b; }
+        button { background: #c0392b; color: white; border: none; padding: 12px 20px; margin: 8px auto; cursor: pointer; border-radius: 5px; font-size: 16px; width: 90%; display: block; }
+        button:hover { background: #e74c3c; transform: scale(1.02); }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>《大朝圣：康康之治》</h1>
+        <div class="stats-bar">
+            <div>天数: <span id="day">1</span>/30</div>
+            <div class="stat-item">国库: <span id="money">50</span></div>
+            <div class="stat-item">民心: <span id="pop">50</span></div>
+            <div style="color: #e74c3c;">昏庸: <span id="bad">0</span>/3</div>
+        </div>
+        <div class="minister-zone">
+            <div class="m-card"><span class="m-name">宰相·李惟庸</span>好感: <span id="f-prime">50</span><div class="favor-bar"><div id="b-prime" class="favor-fill"></div></div></div>
+            <div class="m-card" style="border-top-color:#e67e22;"><span class="m-name" style="color:#e67e22;">将军·蒙恬</span>好感: <span id="f-general">50</span><div class="favor-bar"><div id="b-general" class="favor-fill"></div></div></div>
+            <div class="m-card" style="border-top-color:#9b59b6;"><span class="m-name" style="color:#9b59b6;">内监·魏公公</span>好感: <span id="f-eunuch">50</span><div class="favor-bar"><div id="b-eunuch" class="favor-fill"></div></div></div>
+        </div>
+        <div id="event-box">陛下，该上朝了。</div>
+        <div id="choices"><button onclick="nextDay()">开始今日早朝</button></div>
+    </div>
+
+<script>
+    let day = 1;
+    let money = 50;
+    let pop = 50;
+    let bad = 0;
+    let ministers = {
+        prime: { name: "宰相·李惟庸", favor: 50 },
+        general: { name: "大将军·蒙恬", favor: 50 },
+        eunuch: { name: "太监总管·魏公公", favor: 50 }
+    };
+
+    const events = [
+        {
+            t: "【加征辽饷】北方战事紧迫，宰相建议加征赋税，但这会导致民心大幅下降。",
+            s: "prime",
+            c: [
+                { n: "准奏：稳住前方军费", m: 40, p: -30, b: 1, k: false, f: {prime: 20, general: 15, eunuch: 5} },
+                { n: "驳回：不能再苦百姓了", m: -20, p: 20, b: 0, k: false, f: {prime: -20, general: -10, eunuch: 0} }
+            ]
+        },
+        {
+            t: "【御驾亲征】边境蛮族大举入侵，将军请求您亲自坐镇中军。此举极度危险！",
+            s: "general",
+            c: [
+                { n: "御驾亲征：极大鼓舞士气", m: -30, p: 20, b: 0, k: true, f: {general: 30, prime: -15, eunuch: -5} },
+                { n: "固守待援：虽然安全但丧失国土", m: -10, p: -20, b: 1, k: false, f: {general: -25, prime: 20, eunuch: 5} }
+            ]
+        },
+        {
+            t: "【修建园林】魏公公说内廷需要扩建，这样才能彰显皇家威仪，他可以负责监工。",
+            s: "eunuch",
+            c: [
+                { n: "恩准：修个大的", m: -40, p: -10, b: 2, k: false, f: {eunuch: 30, prime: -20, general: -10} },
+                { n: "拒绝：现在不是享受的时候", m: 0, p: 10, b: 0, k: false, f: {eunuch: -25, prime: 10, general: 10} }
+            ]
+        }
+    ];
+
+    function updateDisplay() {
+        document.getElementById('day').innerText = day;
+        document.getElementById('money').innerText = money;
+        document.getElementById('pop').innerText = pop;
+        document.getElementById('bad').innerText = bad;
+        for (let key in ministers) {
+            document.getElementById('f-' + key).innerText = ministers[key].favor;
+            document.getElementById('b-' + key).style.width = ministers[key].favor + "%";
+        }
+    }
+
+    function handleChoice(c) {
+        money += c.m; pop += c.p; bad += c.b;
+        for (let k in c.f) {
+            ministers[k].favor = Math.max(0, Math.min(100, ministers[k].favor + c.f[k]));
+        }
+        if (c.k && Math.random() < 0.4) {
+            if (ministers.general.favor > 70) alert("危险！幸好将军誓死营救，化险为夷！");
+            else return endGame("【致命失败】您的决策导致政权倾覆，统治终结了。");
+        }
+        day++;
+        updateDisplay();
+        document.getElementById('choices').innerHTML = `<button onclick="nextDay()">准备下一日早朝</button>`;
+    }
+
+    function nextDay() {
+        if (day > 30) return endGame("【完美通关】盛世降临！你是旷古烁今的明君！");
+        if (money <= 0) return endGame("【亡国】国库破产，将士哗变，你被驱逐了。");
+        if (pop <= 0) return endGame("【亡国】民怨沸腾，起义军攻陷了皇都。");
+        if (bad >= 3) return endGame("【罢黜】你因极度昏庸被宗室联合罢免。");
+        if (ministers.general.favor <= 0) return endGame("【兵变】大将军发动政变，自立为王。");
+
+        let ev = events[Math.floor(Math.random() * events.length)];
+        let sObj = ministers[ev.s];
+        document.getElementById('event-box').innerHTML = `<b>${sObj.name}</b> 进言：<br>“${ev.t}”`;
+        let btns = "";
+        ev.c.forEach(choice => {
+            btns += `<button onclick='handleChoice(${JSON.stringify(choice)})'>${choice.n}</button>`;
+        });
+        document.getElementById('choices').innerHTML = btns;
+    }
+
+    function endGame(msg) {
+        document.getElementById('event-box').innerHTML = `<h2>${msg}</h2>`;
+        document.getElementById('choices').innerHTML = `<button onclick="location.reload()">重新转世</button>`;
+    }
+</script>
+</body>
+</html>
